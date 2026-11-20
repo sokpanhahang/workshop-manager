@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workshop Login</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .logo h1 {
+      font-size: 22px;
+      color: #1a1a2e;
+      font-weight: 700;
+    }
+    .logo p { color: #666; font-size: 14px; margin-top: 4px; }
+    label { display: block; font-size: 13px; color: #444; margin-bottom: 6px; font-weight: 600; }
+    input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+      margin-bottom: 18px;
+      transition: border 0.2s;
+    }
+    input:focus { outline: none; border-color: #e67e22; }
+    button {
+      width: 100%;
+      padding: 13px;
+      background: #e67e22;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #d35400; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .error {
+      background: #fdecea;
+      color: #c0392b;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <h1>🪵 Workshop Manager</h1>
+      <p>Carpentry Workshop Management System</p>
+    </div>
+    <div class="error" id="errorMsg"></div>
+    <label for="email">Email Address</label>
+    <input type="email" id="email" placeholder="you@example.com" autocomplete="email" />
+    <label for="password">Password</label>
+    <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password" />
+    <button id="loginBtn" onclick="doLogin()">Sign In</button>
+  </div>
+
+  <script>
+    async function doLogin() {
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const btn      = document.getElementById('loginBtn');
+      const errBox   = document.getElementById('errorMsg');
+
+      errBox.style.display = 'none';
+
+      if (!email || !password) {
+        errBox.textContent = 'Please enter your email and password.';
+        errBox.style.display = 'block';
+        return;
+      }
+
+      btn.disabled    = true;
+      btn.textContent = 'Signing in…';
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        errBox.textContent  = 'Login failed: ' + error.message;
+        errBox.style.display = 'block';
+        btn.disabled        = false;
+        btn.textContent     = 'Sign In';
+        return;
+      }
+
+      // Fetch user role from profiles table
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, full_name')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profile) {
+        localStorage.setItem('ws_role',      profile.role);
+        localStorage.setItem('ws_name',      profile.full_name);
+        localStorage.setItem('ws_user_id',   data.user.id);
+      }
+
+      window.location.href = 'index.html';
+    }
+
+    // Allow Enter key to submit
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    // If already logged in, redirect
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) window.location.href = 'index.html';
+    })();
+  </script>
+</body>
+</html>

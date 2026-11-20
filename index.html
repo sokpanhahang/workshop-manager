@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workshop Manager</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f4f6f9; }
+
+    /* ── Top Nav ── */
+    .topbar {
+      background: #1a1a2e;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 56px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .topbar .brand { font-weight: 700; font-size: 17px; }
+    .topbar .user-info { font-size: 13px; color: #ccc; display: flex; align-items: center; gap: 12px; }
+    .topbar .logout-btn {
+      background: none; border: 1px solid #666; color: #ccc;
+      padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    }
+    .topbar .logout-btn:hover { border-color: #e67e22; color: #e67e22; }
+
+    /* ── Tab Nav ── */
+    .tab-nav {
+      background: #fff;
+      border-bottom: 2px solid #e8e8e8;
+      display: flex;
+      overflow-x: auto;
+      padding: 0 16px;
+    }
+    .tab-btn {
+      padding: 14px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #666;
+      border: none;
+      background: none;
+      cursor: pointer;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: #e67e22; }
+    .tab-btn.active { color: #e67e22; border-bottom-color: #e67e22; }
+    .tab-btn.hidden { display: none; }
+
+    /* ── Content ── */
+    .tab-content { display: none; padding: 24px 20px; }
+    .tab-content.active { display: block; }
+
+    /* ── Cards / Tables ── */
+    .section-title { font-size: 20px; font-weight: 700; color: #1a1a2e; margin-bottom: 20px; }
+    .card {
+      background: #fff; border-radius: 10px;
+      padding: 20px; margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card h3 { font-size: 15px; color: #444; margin-bottom: 14px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f8f9fa; text-align: left; padding: 10px 12px; font-size: 13px; color: #666; }
+    td { padding: 10px 12px; font-size: 14px; border-bottom: 1px solid #f0f0f0; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block; padding: 3px 10px; border-radius: 20px;
+      font-size: 12px; font-weight: 600;
+    }
+    .badge-pending  { background: #fff3cd; color: #856404; }
+    .badge-approved { background: #d1e7dd; color: #0f5132; }
+    .badge-rejected { background: #f8d7da; color: #721c24; }
+    .badge-low      { background: #f8d7da; color: #721c24; }
+    .badge-ok       { background: #d1e7dd; color: #0f5132; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 9px 18px; border-radius: 7px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .btn-primary { background: #e67e22; color: #fff; }
+    .btn-primary:hover { background: #d35400; }
+    .btn-success { background: #27ae60; color: #fff; }
+    .btn-danger  { background: #e74c3c; color: #fff; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+
+    /* ── Forms ── */
+    .form-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; }
+    .form-group { display: flex; flex-direction: column; flex: 1; min-width: 200px; }
+    .form-group label { font-size: 13px; color: #555; margin-bottom: 5px; font-weight: 600; }
+    .form-group input, .form-group select, .form-group textarea {
+      padding: 9px 12px; border: 1.5px solid #ddd; border-radius: 7px;
+      font-size: 14px; font-family: inherit;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none; border-color: #e67e22;
+    }
+
+    /* ── KPI Cards ── */
+    .kpi-row { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+    .kpi-card {
+      background: #fff; border-radius: 10px; padding: 20px 24px;
+      flex: 1; min-width: 150px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      border-left: 4px solid #e67e22;
+    }
+    .kpi-card .kpi-value { font-size: 32px; font-weight: 700; color: #1a1a2e; }
+    .kpi-card .kpi-label { font-size: 13px; color: #888; margin-top: 4px; }
+
+    .msg { padding: 10px 14px; border-radius: 7px; margin-bottom: 14px; font-size: 14px; }
+    .msg-success { background: #d1e7dd; color: #0f5132; }
+    .msg-error   { background: #f8d7da; color: #721c24; }
+    .loading     { color: #888; font-size: 14px; padding: 20px 0; }
+
+    @media (max-width: 600px) {
+      .topbar .brand { font-size: 14px; }
+      .kpi-card .kpi-value { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="brand">🪵 Workshop Manager</div>
+  <div class="user-info">
+    <span id="userName">Loading…</span>
+    <button class="logout-btn" onclick="doLogout()">Sign Out</button>
+  </div>
+</div>
+
+<!-- Tab Navigation -->
+<div class="tab-nav" id="tabNav">
+  <button class="tab-btn" data-tab="dashboard"    data-roles="boss">Dashboard</button>
+  <button class="tab-btn" data-tab="orders"        data-roles="boss,purchasing">Purchase Orders</button>
+  <button class="tab-btn" data-tab="stock"         data-roles="boss,stock_manager,worker">Stock</button>
+  <button class="tab-btn" data-tab="daily-report"  data-roles="boss,worker">Daily Reports</button>
+  <button class="tab-btn" data-tab="accounting"    data-roles="boss,accountant">Accounting</button>
+</div>
+
+<!-- Tab Contents (populated by JS modules) -->
+<div class="tab-content" id="tab-dashboard">
+  <div class="loading" id="dashboard-loading">Loading dashboard…</div>
+</div>
+<div class="tab-content" id="tab-orders">
+  <div class="loading" id="orders-loading">Loading orders…</div>
+</div>
+<div class="tab-content" id="tab-stock">
+  <div class="loading" id="stock-loading">Loading stock…</div>
+</div>
+<div class="tab-content" id="tab-daily-report">
+  <div class="loading" id="daily-report-loading">Loading reports…</div>
+</div>
+<div class="tab-content" id="tab-accounting">
+  <div class="loading" id="accounting-loading">Loading accounting…</div>
+</div>
+
+<!-- Module Scripts -->
+<script src="modules/dashboard.js"></script>
+<script src="modules/orders.js"></script>
+<script src="modules/stock.js"></script>
+<script src="modules/daily-report.js"></script>
+<script src="modules/accounting.js"></script>
+
+<script>
+  const role   = localStorage.getItem('ws_role')    || '';
+  const wsName = localStorage.getItem('ws_name')    || 'User';
+  const userId = localStorage.getItem('ws_user_id') || '';
+
+  // ── Auth Guard ──
+  (async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) window.location.href = 'login.html';
+  })();
+
+  // ── Show user name ──
+  document.getElementById('userName').textContent = wsName + ' (' + role + ')';
+
+  // ── Tab visibility by role ──
+  const tabs = document.querySelectorAll('.tab-btn');
+  let firstVisible = null;
+  tabs.forEach(btn => {
+    const allowed = btn.dataset.roles.split(',');
+    if (!allowed.includes(role)) {
+      btn.classList.add('hidden');
+    } else if (!firstVisible) {
+      firstVisible = btn.dataset.tab;
+    }
+  });
+
+  // ── Tab switching ──
+  function showTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tabId).classList.add('active');
+    document.querySelector('[data-tab="' + tabId + '"]').classList.add('active');
+
+    // Call module init
+    if (tabId === 'dashboard'   && typeof initDashboard   === 'function') initDashboard();
+    if (tabId === 'orders'      && typeof initOrders       === 'function') initOrders();
+    if (tabId === 'stock'       && typeof initStock        === 'function') initStock();
+    if (tabId === 'daily-report'&& typeof initDailyReport  === 'function') initDailyReport();
+    if (tabId === 'accounting'  && typeof initAccounting   === 'function') initAccounting();
+  }
+
+  tabs.forEach(btn => {
+    if (!btn.classList.contains('hidden')) {
+      btn.addEventListener('click', () => showTab(btn.dataset.tab));
+    }
+  });
+
+  // ── Show first allowed tab ──
+  if (firstVisible) showTab(firstVisible);
+
+  // ── Logout ──
+  async function doLogout() {
+    await supabase.auth.signOut();
+    localStorage.clear();
+    window.location.href = 'login.html';
+  }
+</script>
+</body>
+</html>
